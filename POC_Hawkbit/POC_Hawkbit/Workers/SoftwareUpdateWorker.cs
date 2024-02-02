@@ -1,4 +1,5 @@
-﻿using POC_Hawkbit.SoftwareUpdates.Models.Hawkbit.DeploymentModels;
+﻿using System.Linq.Expressions;
+using POC_Hawkbit.SoftwareUpdates.Models.Hawkbit.DeploymentModels;
 
 namespace POC_Hawkbit.Workers;
 
@@ -8,33 +9,57 @@ public class SoftwareUpdateWorker(IHawkbitClient hawkbitClient): BackgroundServi
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            var controller = await hawkbitClient.GetRequiredUpdateAsync(stoppingToken);
+            var controller = await hawkbitClient.GetRequiredUpdateAsync(stoppingToken).ConfigureAwait(false);
 
             if (controller == null)
             {
-                await Task.Delay(TimeSpan.FromMinutes(20), stoppingToken);
+                await Task.Delay(TimeSpan.FromMinutes(20), stoppingToken).ConfigureAwait(false);
                 continue;
             }
 
             if (controller.Links.DeploymentBase != null)
             {
-                await PerformSoftwareUpdateAsync(controller.Links.DeploymentBase.Href, stoppingToken);
+                await PerformSoftwareUpdateAsync(controller.Links.DeploymentBase.Href, stoppingToken).ConfigureAwait(false);
             }
 
-            await Task.Delay(controller.Config.Polling.Sleep, stoppingToken);
+            await Task.Delay(controller.Config.Polling.Sleep, stoppingToken).ConfigureAwait(false);
         }
     }
     
     private async Task PerformSoftwareUpdateAsync(string url, CancellationToken cancellationToken)
     {
-        var request = await hawkbitClient.GetAsync<DeploymentRequest>(url, cancellationToken);
+        var request = await hawkbitClient.GetAsync<DeploymentRequest>(url, cancellationToken).ConfigureAwait(false);
 
         if (request is null)
             return;
+
+        await DownloadFilesAsync(request.Deployment, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task DownloadFilesAsync(Deployment deployment, CancellationToken cancellationToken)
+    {
+        var downloadTasks = deployment.Chunks
+                                                        .SelectMany(chunk => chunk.Artifacts)
+                                                        .Select(a => DownloadArtifact(a, cancellationToken));
+
+        await Task.WhenAll(downloadTasks).ConfigureAwait(false);
+    }
+
+    private async Task<bool> DownloadArtifact(Artifact artifact, CancellationToken cancellationToken)
+    {
+        await Task.Delay(200, cancellationToken);
+
+        var file = await hawkbitClient.DownloadFileAsync(artifact.Links.Download.Href, cancellationToken)
+                                           .ConfigureAwait(false);
+
+        var folder = $@"C:\SVC\software-update\{DateTime.UtcNow:dd-MMM-yyyy HH-mm-ss-fff}";
+
+        if (!Directory.Exists(folder))
+            Directory.CreateDirectory(folder);
         
-        foreach (var VARIABLE in request.Deployment.Chunks)
-        {
-            
-        }
+        var path = $@"{folder}\{artifact.Filename}";
+        await File.WriteAllBytesAsync(path, file, cancellationToken).ConfigureAwait(false);
+
+        return true;
     }
 }
