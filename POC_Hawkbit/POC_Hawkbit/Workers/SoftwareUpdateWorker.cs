@@ -1,4 +1,6 @@
-﻿namespace POC_Hawkbit.Workers;
+﻿using POC_Hawkbit.SoftwareUpdates.Models.Hawkbit.DeploymentModels;
+
+namespace POC_Hawkbit.Workers;
 
 public class SoftwareUpdateWorker(IHawkbitClient hawkbitClient): BackgroundService
 {
@@ -6,7 +8,7 @@ public class SoftwareUpdateWorker(IHawkbitClient hawkbitClient): BackgroundServi
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            var controller = await hawkbitClient.GetRequiredUpdate(stoppingToken);
+            var controller = await hawkbitClient.GetRequiredUpdateAsync(stoppingToken);
 
             if (controller == null)
             {
@@ -25,7 +27,14 @@ public class SoftwareUpdateWorker(IHawkbitClient hawkbitClient): BackgroundServi
     
     private async Task PerformSoftwareUpdateAsync(string url, CancellationToken cancellationToken)
     {
-        var result = await hawkbitClient.GetDeployment(url, cancellationToken);
+        var request = await hawkbitClient.GetAsync<DeploymentRequest>(url, cancellationToken);
+
+        if (request is null)
+            return;
         
+        foreach (var VARIABLE in request.Deployment.Chunks)
+        {
+            
+        }
     }
 }
