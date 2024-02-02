@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using POC_Hawkbit.SoftwareUpdates.Models.Hawkbit.ControllerModels;
 
 namespace POC_Hawkbit.SoftwareUpdates;
@@ -33,7 +34,7 @@ public class HawkbitHttpClient(IHttpClientFactory httpClientFactory) : IHawkbitC
     public async Task<bool> UpdateStatusAsync(int id, CancellationToken cancellationToken)
     {
         var timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.ffff");
-        var url = $"/controller/v1/gate1/deploymentBase/{id}/feedback";
+        var url = $"/DEFAULT/controller/v1/gate1/deploymentBase/{id}/feedback";
         
         var request = $$"""
                       {
@@ -57,7 +58,9 @@ public class HawkbitHttpClient(IHttpClientFactory httpClientFactory) : IHawkbitC
                       }
                       """;
 
-        var response = await _client.PostAsJsonAsync(url, request, cancellationToken).ConfigureAwait(false);
+        var content = new StringContent(request, Encoding.UTF8, "application/json");
+        
+        var response = await _client.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
         return response.StatusCode == HttpStatusCode.OK;
     }
 }
