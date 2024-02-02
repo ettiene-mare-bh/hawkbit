@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Json;
+﻿using System.Net;
+using System.Net.Http.Json;
 using POC_Hawkbit.SoftwareUpdates.Models.Hawkbit.ControllerModels;
 
 namespace POC_Hawkbit.SoftwareUpdates;
@@ -9,6 +10,8 @@ public interface IHawkbitClient
     Task<T?> GetAsync<T>(string url, CancellationToken cancellationToken);
 
     Task<byte[]> DownloadFileAsync(string url, CancellationToken cancellationToken);
+
+    Task<bool> UpdateStatusAsync(int id, CancellationToken cancellationToken);
 }
 
 public class HawkbitHttpClient(IHttpClientFactory httpClientFactory) : IHawkbitClient
@@ -26,4 +29,35 @@ public class HawkbitHttpClient(IHttpClientFactory httpClientFactory) : IHawkbitC
 
     public Task<byte[]> DownloadFileAsync(string url, CancellationToken cancellationToken) =>
         _client.GetByteArrayAsync(url, cancellationToken);
+
+    public async Task<bool> UpdateStatusAsync(int id, CancellationToken cancellationToken)
+    {
+        var timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.ffff");
+        var url = $"/controller/v1/gate1/deploymentBase/{id}/feedback";
+        
+        var request = $$"""
+                      {
+                        "id": "{{id}}",
+                        "time": "{{timestamp}}",
+                        "status": {
+                          "execution0": "downloaded",
+                          "execution": "closed",
+                          "result": {
+                            "finished": "success",
+                            "progress": {
+                              "cnt": 1,
+                              "of": 5
+                            }
+                          },
+                          "code": 200,
+                          "details": [
+                            "string"
+                          ]
+                        }
+                      }
+                      """;
+
+        var response = await _client.PostAsJsonAsync(url, request, cancellationToken).ConfigureAwait(false);
+        return response.StatusCode == HttpStatusCode.OK;
+    }
 }

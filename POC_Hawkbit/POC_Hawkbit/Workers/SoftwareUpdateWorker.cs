@@ -34,6 +34,8 @@ public class SoftwareUpdateWorker(IHawkbitClient hawkbitClient): BackgroundServi
             return;
 
         await DownloadFilesAsync(request.Deployment, cancellationToken).ConfigureAwait(false);
+        await Task.Delay(10_000, cancellationToken).ConfigureAwait(false);
+        await UpdateStatusAsync(request.Id, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task DownloadFilesAsync(Deployment deployment, CancellationToken cancellationToken)
@@ -61,5 +63,11 @@ public class SoftwareUpdateWorker(IHawkbitClient hawkbitClient): BackgroundServi
         await File.WriteAllBytesAsync(path, file, cancellationToken).ConfigureAwait(false);
 
         return true;
+    }
+
+    private async Task UpdateStatusAsync(int id, CancellationToken cancellationToken)
+    {
+        var response = await hawkbitClient.UpdateStatusAsync(id, cancellationToken).ConfigureAwait(false);
+        await Task.Delay(2000, cancellationToken);
     }
 }
